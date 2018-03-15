@@ -3,35 +3,52 @@
 /* ************************************************** */
 #include "Adafruit_TLC5947.h"
 
-// ------------------------------------------------------------
-// Quel cible on utilise, (commenter la ligne inutile)
-#define ARDUINO_NANO
 
 // ***********************************************************************
-// **                                                                   **
-// DUREE DES ETATS ON et OFF des LEDs 
+// ***********************************************************************
+// ***********************************************************************
+// ***********************************************************************
+
+
+// ------------------------------------------------------------
+// activer le mode de fonctionnement, commenter les autres modes
+// #define MODE_TEST_LED    
+//#define MODE_MULTI_LED_PROGRESSIF
+#define MODE_CHENILLARD_UNE_PROGRESSIF
+
+// ------------------------------------------------------------
+// DUREE DES ETATS ON et OFF des LEDs pour le mde MODE_MULTI_LED_PROGRESSIF
 // ATTENTION MAX doit etre superieur ou égal à MIN
 // plus les temps sont long, plus la progression bers le On ou vers le OFF est rapide
 #define ETAT_OFF_MIN  (25)       // temps minimum d'une led etainte,   si led ne sont pas assez souvent eteinte, on augmente cette valeur
 #define ETAT_OFF_MAX  (100)      // temps maximum d'une led  eteinte,  S'il y a trop de led allumée en m^me temps tu augmente cette valeur 
 
-#define ETAT_ON_MIN  (2)       // temps minimum d'une led  allumée ( sans effet flagrand)
+#define ETAT_ON_MIN  (3)       // temps minimum d'une led  allumée ( sans effet flagrand)
 #define ETAT_ON_MAX  (5)       // temps maximum d'une led  allumée  ( sans effet flagrand)
 
+// ------------------------------------------------------------
 // On active une ligne ou l'autre
-//#define MODE_PROGRESSION_1  	// la progression se fait sur 14 steps
-#define MODE_PROGRESSION_2  	// la progression se fait sur 25 steps
+//#define MODE_PROGRESSION_14  	// la progression se fait sur 14 steps
+#define MODE_PROGRESSION_25  	// la progression se fait sur 25 steps
 
-//#define SYNCHROISEE 			// Si cette ligne est active sa ralentie tous, et c'est moins fluide ca prenf trop de temps
-// **                                                                   **
+// ------------------------------------------------------------
+// Si cette ligne est active sa ralentie tous, et c'est moins fluide ca prenf trop de temps
+//#define SYNCHROISEE 			
+
+// ------------------------------------------------------------
+// Tempo pour le mode MODE_CHENILLARD_UNE_PROGRESSIF
+#define DELAY_PROGRESSIF_ON  (3)  // Pause en ms entre chaque step d'allumage de la led
+#define DELAY_PROGRESSIF_OFF (5)  // Pause en ms entre chaque step d'extinction de la led
+
+// ***********************************************************************
+// ***********************************************************************
+// ***********************************************************************
 // ***********************************************************************
 
 
 // ------------------------------------------------------------
-// activer le mode test des led, sinon commenter cette ligne
-// #define MODE_TEST_LED		
-#define MODE_MULTI_LED_FLOU
-//#define MODE_CHENILLARD_FLOU
+// Quel cible on utilise, (commenter la ligne inutile)
+#define ARDUINO_NANO
 
 // ------------------------------------------------------------
 // Combien de hardWare sont enchainé ?
@@ -62,12 +79,12 @@
 // les 8 valeurs ne sont pas linéaire, c'est volontaire, pourmieux voirla progression lumineuse
 
 
-#ifdef MODE_PROGRESSION_1
+#ifdef MODE_PROGRESSION_14
  #define NB_BRIGHTNESS_VALUE (14)
  uint16_t tabBrightness[NB_BRIGHTNESS_VALUE] = {0, 1, 2, 4, 8, 16 , 32, 64, 128, 256, 512, 1024, 2048, 4096 };
 #endif
 
-#ifdef MODE_PROGRESSION_2
+#ifdef MODE_PROGRESSION_25
  #define NB_BRIGHTNESS_VALUE (25)
  uint16_t tabBrightness[NB_BRIGHTNESS_VALUE] = {0,1,2, 3, 4, 6, 8, 12, 16,  24, 32,  48, 64,  96, 128, 192, 256, 384, 512, 768, 1024,  1536, 2048,  3072, 4096 };
 #endif
@@ -135,12 +152,12 @@ void loop() {
 	testOut();
 #endif  
 
-#ifdef MODE_MULTI_LED_FLOU
+#ifdef MODE_MULTI_LED_PROGRESSIF
     gestionLed();
 #endif 
 
-#ifdef MODE_CHENILLARD_FLOU
-  gestionLed();
+#ifdef MODE_CHENILLARD_UNE_PROGRESSIF
+  gestionLed_chenillard();
 #endif
  
 }
@@ -154,13 +171,37 @@ void testOut() {
 	{
 		tlc.setPWM(i, 0x7ff );  // de 0 à 0x7ff, pour la luminosité
 		tlc.write(); 
-		delay(250);
+		delay(DELAY_PROGRESSIF_ON);
 
 		tlc.setPWM(i, 0 ); 
 		tlc.write(); 
 		delay(1);
 	}
 
+}
+
+/* *********************************************************************** */
+/* gestionLed_chenillard()                                                 */ 
+/* *********************************************************************** */  
+void gestionLed_chenillard() {
+	int pos = 0;
+	int led = 0;
+
+	for (led = 0; led < NB_LED; led += 1)
+	{
+	
+		for (pos = 0; pos < NB_BRIGHTNESS_VALUE; pos += 1) { // goes from 0 degrees to 180 degrees
+			tlc.setPWM(led,tabBrightness[pos]);
+			tlc.write();
+			delay(DELAY_PROGRESSIF_ON);                       // waits 15ms for the servo to reach the position
+		}
+		for (pos = NB_BRIGHTNESS_VALUE ; pos > 0; pos -= 1) { // goes from 180 degrees to 0 degrees
+			tlc.setPWM(led,tabBrightness[pos-1]);
+			tlc.write();
+			delay(DELAY_PROGRESSIF_OFF);                       // waits 15ms for the servo to reach the position
+		}
+	}
+	
 }
 
 
