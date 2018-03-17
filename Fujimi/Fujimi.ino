@@ -3,28 +3,25 @@
 /* ************************************************** */
 #include "Adafruit_TLC5947.h"
 
-
 // ***********************************************************************
 // ***********************************************************************
-// ***********************************************************************
-// ***********************************************************************
-
 
 // ------------------------------------------------------------
-// activer le mode de fonctionnement, commenter les autres modes
-// #define MODE_TEST_LED    
-//#define MODE_MULTI_LED_PROGRESSIF
-#define MODE_CHENILLARD_UNE_PROGRESSIF
+// LES différent MODEDE FONCTIONNEMENTS
+// #define MODE_TEST_LED
+#define MODE_MULTI_LED_PROGRESSIF_RANDOM
+// #define MODE_MULTI_LED_PROGRESSIF_FIXE
+//#define MODE_CHENILLARD_UNE_PROGRESSIF
 
 // ------------------------------------------------------------
 // DUREE DES ETATS ON et OFF des LEDs pour le mde MODE_MULTI_LED_PROGRESSIF
 // ATTENTION MAX doit etre superieur ou égal à MIN
 // plus les temps sont long, plus la progression bers le On ou vers le OFF est rapide
-#define ETAT_OFF_MIN  (25)       // temps minimum d'une led etainte,   si led ne sont pas assez souvent eteinte, on augmente cette valeur
-#define ETAT_OFF_MAX  (100)      // temps maximum d'une led  eteinte,  S'il y a trop de led allumée en m^me temps tu augmente cette valeur 
+#define ETAT_OFF_MIN  (1)       // temps minimum d'une led etainte,   si led ne sont pas assez souvent eteinte, on augmente cette valeur
+#define ETAT_OFF_MAX  (40)      // temps maximum d'une led  eteinte,  S'il y a trop de led allumée en m^me temps tu augmente cette valeur 
 
-#define ETAT_ON_MIN  (3)       // temps minimum d'une led  allumée ( sans effet flagrand)
-#define ETAT_ON_MAX  (5)       // temps maximum d'une led  allumée  ( sans effet flagrand)
+#define ETAT_ON_MIN  (2)       // temps minimum d'une led  allumée ( sans effet flagrand)
+#define ETAT_ON_MAX  (50)       // temps maximum d'une led  allumée  ( sans effet flagrand)
 
 // ------------------------------------------------------------
 // On active une ligne ou l'autre
@@ -90,6 +87,13 @@
 #endif
 
 
+uint16_t tabStartOff[NB_LED] 	= {5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100,105,110,115,120 };
+
+uint16_t tabIniOff[NB_LED]       = {6,2,21,7,37,4,30,31,28,21,11,15,12,17,6,11,39,13,6,22,34,20,2,12};
+//uint16_t tabIniOff[NB_LED]     = {2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48};
+//uint16_t tabIniOff[NB_LED]       = {20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20};
+uint16_t tabIniOn[NB_LED]        = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
+
 // ------------------------------------------------------------
 // Object depilotage du driver de LED
 Adafruit_TLC5947 tlc = Adafruit_TLC5947(NUM_TLC5974, PIN_CLOCK, PIN_DATA, PIN_LATCH);
@@ -112,7 +116,6 @@ typedef struct {
 // ------------------------------------------------------------
 // un tableau de n structure d'etat. n étant le nb de led.
   ST_ETAT_LED2 tabLedPpm2[NB_LED]; 
-
   
 /* ************************************************************ */
 // PGM SETUP, Lance une seul fois au demarage
@@ -133,13 +136,22 @@ void setup() {
 		tabLedPpm2[i].brightnessOld 			= -1; // pour etre sur que ce soit different de '0'
 		tabLedPpm2[i].etat 						= 0;
 
-		tabLedPpm2[i].tempo_etat_off 			= random (ETAT_OFF_MIN, ETAT_OFF_MAX); ; // juste pour décaler l'allumage des led la premire fois
+    tabLedPpm2[i].tempo_etat_off      = 50 ; //random (ETAT_OFF_MIN, ETAT_OFF_MAX); ; // juste pour décaler l'allumage des led la premire fois
+
+
 		
 		tabLedPpm2[i].indexMontee 				= 0;
-		tabLedPpm2[i].maintien 					= random (ETAT_ON_MIN, ETAT_ON_MAX); ;
+		tabLedPpm2[i].maintien 					  = 5 ; //random (ETAT_ON_MIN, ETAT_ON_MAX); ;
 		tabLedPpm2[i].indexDescente 			= 0 ;
+
+#ifdef MODE_MULTI_LED_PROGRESSIF_FIXE
+	tabLedPpm2[i].tempo_etat_off = tabStartOff[i];
+	//tabLedPpm2[i].maintien       = tabIniOn[i];
+#endif
+
 	}
 }
+
 
 
 /* *********************************************************************** */
@@ -148,11 +160,15 @@ void setup() {
 /* *********************************************************************** */
 void loop() {
   
-#ifdef MODE_TEST_LED
-	testOut();
+#ifdef MODE_TEST_LED  
+  testOut();
 #endif  
 
-#ifdef MODE_MULTI_LED_PROGRESSIF
+#ifdef MODE_MULTI_LED_PROGRESSIF_RANDOM
+    gestionLed();
+#endif 
+
+#ifdef MODE_MULTI_LED_PROGRESSIF_FIXE
     gestionLed();
 #endif 
 
@@ -250,7 +266,13 @@ void calcbright(int channel)
     {
     case 0: // led eteinte pendant un certain temps !
 		if ( tabLedPpm2[channel].tempo_etat_off-- <= 0){
-			tabLedPpm2[channel].tempo_etat_off = random (ETAT_OFF_MIN, ETAT_OFF_MAX); ;
+			
+#ifdef MODE_MULTI_LED_PROGRESSIF_FIXE
+   tabLedPpm2[channel].tempo_etat_off = tabIniOff[channel];
+#endif
+#ifdef MODE_MULTI_LED_PROGRESSIF_RANDOM
+   tabLedPpm2[channel].tempo_etat_off = random (ETAT_OFF_MIN, ETAT_OFF_MAX); ;
+#endif
 			tabLedPpm2[channel].etat = 1;
 		}
 	break;
@@ -266,7 +288,14 @@ void calcbright(int channel)
       
     case 2:   // Maintenir en position
 		if ( tabLedPpm2[channel].maintien-- <= 0){
-			tabLedPpm2[channel].maintien = random (ETAT_ON_MIN, ETAT_ON_MAX); ;
+#ifdef MODE_MULTI_LED_PROGRESSIF_FIXE
+   tabLedPpm2[channel].maintien       = tabIniOn[channel];
+#endif
+#ifdef MODE_MULTI_LED_PROGRESSIF_RANDOM
+   tabLedPpm2[channel].maintien       = random (ETAT_ON_MIN, ETAT_ON_MAX); ;
+#endif
+
+     
 			tabLedPpm2[channel].etat = 3;
 			tabLedPpm2[channel].indexDescente = NB_BRIGHTNESS_VALUE-1 ;
 		}  
